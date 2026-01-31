@@ -1,14 +1,13 @@
 version: '3.8'
 
 services:
-  # 1. Database Service
   database:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: database
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: saas_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
@@ -18,63 +17,43 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - saas-network
 
-  # 2. Backend API Service
   backend:
     build: ./backend
     container_name: backend
     ports:
       - "5000:5000"
     environment:
-      # Dynamic String Construction using .env variables
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?schema=public"
-      # Consistency for other vars (optional but good practice to match)
       DB_HOST: database
       DB_PORT: 5432
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      JWT_SECRET: super_secret_jwt_key_at_least_32_chars_long
+      DB_NAME: saas_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: supersecretkey_must_be_long_safe
       JWT_EXPIRES_IN: 24h
       PORT: 5000
-      # Allow requests from browser (localhost:3000)
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: http://frontend:3000
     depends_on:
       database:
         condition: service_healthy
     healthcheck:
-      # Verifies the API is responsive
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - saas-network
 
-  # 3. Frontend Service
   frontend:
     build: ./frontend
     container_name: frontend
     ports:
       - "3000:3000"
     environment:
-      # Browser needs to access backend at localhost:5000
       REACT_APP_API_URL: http://localhost:5000/api
-      # Prevent browser opening in container
-      BROWSER: none
-    stdin_open: true # Fix for React scripts exiting immediately
-    tty: true
     depends_on:
       backend:
         condition: service_healthy
-    networks:
-      - saas-network
+    stdin_open: true
+    tty: true
 
 volumes:
   db_data:
-
-networks:
-  saas-network:
-    driver: bridge

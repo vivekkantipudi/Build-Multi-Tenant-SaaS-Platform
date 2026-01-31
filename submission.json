@@ -1,4 +1,7 @@
 {
+  "api_url": "http://localhost:5000",
+  "web_url": "http://localhost:3000",
+  "demo_video_url": "PUT_YOUR_YOUTUBE_LINK_HERE",
   "testCredentials": {
     "superAdmin": {
       "email": "superadmin@system.com",
@@ -26,8 +29,8 @@
         ],
         "projects": [
           {
-            "name": "Website Redesign",
-            "description": "Overhaul of the corporate website"
+            "name": "Project Alpha",
+            "description": "First demo project"
           }
         ]
       }
