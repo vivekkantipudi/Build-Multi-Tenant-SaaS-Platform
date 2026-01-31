@@ -26,8 +26,8 @@ A production-ready, containerized Multi-Tenant SaaS application for project and 
 ### Steps to Run
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repo-url>
-    cd <your-repo-folder>
+    git clone https://github.com/vivekkantipudi/Build-Multi-Tenant-SaaS-Platform.git
+    cd Build-Multi-Tenant-SaaS-Platform
     ```
 
 2.  **Start the Application:**
