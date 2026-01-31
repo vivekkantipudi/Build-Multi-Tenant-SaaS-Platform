@@ -2,7 +2,7 @@
 
 A production-ready, containerized Multi-Tenant SaaS application for project and task management. It features strict data isolation, role-based access control (RBAC), and subscription management.
 
-## 🚀 Features
+## Features
 * **Multi-Tenancy:** Data isolation using a Shared Database, Shared Schema approach with `tenant_id` filtering.
 * **Authentication:** Secure JWT-based auth with role management (Super Admin, Tenant Admin, User).
 * **RBAC:** Granular permissions for different user roles.
@@ -11,13 +11,13 @@ A production-ready, containerized Multi-Tenant SaaS application for project and 
 * **Dockerized:** Fully containerized setup (Frontend, Backend, Database) with one-command deployment.
 * **Auto-Seeding:** Database automatically populates with test data on startup.
 
-## 🛠 Tech Stack
+## Tech Stack
 * **Frontend:** React.js, Docker
 * **Backend:** Node.js, Express, PostgreSQL (pg)
 * **Database:** PostgreSQL 15
 * **DevOps:** Docker, Docker Compose
 
-## 📦 Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 * Docker & Docker Compose installed on your machine.
@@ -46,7 +46,7 @@ A production-ready, containerized Multi-Tenant SaaS application for project and 
     * **Frontend:** [http://localhost:3000](http://localhost:3000)
     * **Backend Health:** [http://localhost:5000/api/health](http://localhost:5000/api/health)
 
-## 🔑 Default Credentials (Seed Data)
+## Default Credentials (Seed Data)
 The system comes pre-loaded with a demo tenant.
 
 | Role | Email | Password | Subdomain |
@@ -56,7 +56,7 @@ The system comes pre-loaded with a demo tenant.
 | **Super Admin** | `superadmin@system.com` | `Admin@123` | (Leave Empty) |
 
 
-## 📚 Documentation
+## Documentation
 * [Research & Analysis](docs/research.md)
 * [Product Requirements (PRD)](docs/PRD.md)
 * [System Architecture](docs/architecture.md)
