@@ -1,26 +1,15 @@
 FROM node:18-alpine
 
-# Install curl for healthcheck and openssl for Prisma
-RUN apk add --no-cache curl openssl
+# This line fixes the crash by installing tools needed for bcrypt
+RUN apk add --no-cache python3 make g++ curl
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# This rebuilds bcrypt for the Docker environment
+RUN npm install && npm rebuild bcrypt --build-from-source
 
-# Copy source code
 COPY . .
 
-# Generate Prisma Client
-RUN npx prisma generate
-
-# Expose port
-EXPOSE 5000
-
-# Start command: Run migrations, Seed DB, then Start Server
-# Using 'npx prisma migrate deploy' ensures schema is up to date
-# 'npm run seed' populates the DB
-CMD sh -c "npx prisma migrate deploy && npm run seed && node src/index.js"
+CMD ["npm", "start"]
