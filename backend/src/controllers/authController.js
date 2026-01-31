@@ -1,101 +1,70 @@
-const { PrismaClient } = require('@prisma/client');
-const { hashPassword, comparePassword } = require('../utils/hash');
-const { generateToken } = require('../utils/jwt');
-const { logAudit } = require('../services/auditService');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const pool = require('../config/db');
 
-const prisma = new PrismaClient();
-
-const registerTenant = async (req, res, next) => {
-  // Added 'plan' to destructuring to avoid hardcoding 'free'
-  const { tenantName, subdomain, adminEmail, adminPassword, adminFullName, plan } = req.body;
-  try {
-    const existing = await prisma.tenant.findUnique({ where: { subdomain } });
-    if (existing) {
-      res.status(409);
-      throw new Error('Subdomain exists');
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({
-        // Use the plan from the request body, default to 'free' if not provided
-        data: { name: tenantName, subdomain, subscriptionPlan: plan || 'free' }
-      });
-      const hashedPassword = await hashPassword(adminPassword);
-      const user = await tx.user.create({
-        data: { tenantId: tenant.id, email: adminEmail, passwordHash: hashedPassword, fullName: adminFullName, role: 'tenant_admin' }
-      });
-      return { tenant, user };
-    });
-
-    res.status(201).json({ success: true, data: result });
-  } catch (error) { next(error); }
-};
-
-const login = async (req, res, next) => {
+exports.login = async (req, res) => {
   const { email, password, tenantSubdomain } = req.body;
   try {
-    let user;
     let tenantId = null;
 
-    // --- SUPER ADMIN LOGIC START ---
-    if (email === 'superadmin@system.com') {
-        user = await prisma.user.findFirst({
-            where: {
-                email: 'superadmin@system.com',
-                role: 'super_admin',
-                tenantId: null 
-            }
-        });
-        
-        if (!user) {
-            res.status(401);
-            throw new Error('Invalid credentials');
-        }
-    } 
-    else {
-        if (tenantSubdomain) {
-            const tenant = await prisma.tenant.findUnique({ where: { subdomain: tenantSubdomain } });
-            if (!tenant) { res.status(404); throw new Error('Tenant not found'); }
-            tenantId = tenant.id;
-        }
-
-        if (tenantId) {
-             user = await prisma.user.findFirst({ 
-                 where: { email: email, tenantId: tenantId } 
-             });
-        } else {
-             user = await prisma.user.findFirst({ where: { email, tenantId: null } });
-        }
+    if (tenantSubdomain) {
+      const tRes = await pool.query('SELECT id, status FROM tenants WHERE subdomain = $1', [tenantSubdomain]);
+      if (tRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Tenant not found' });
+      tenantId = tRes.rows[0].id;
     }
 
-    if (!user || !(await comparePassword(password, user.passwordHash))) {
-      res.status(401); throw new Error('Invalid credentials');
-    }
+    let query = 'SELECT * FROM users WHERE email = $1 AND tenant_id ';
+    query += tenantId ? '= $2' : 'IS NULL';
+    const params = tenantId ? [email, tenantId] : [email];
+    
+    const uRes = await pool.query(query, params);
+    if (uRes.rows.length === 0) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    
+    const user = uRes.rows[0];
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    res.json({ 
-        success: true, 
-        token: generateToken({ ...user, tenantId: user.tenantId }), 
-        data: { 
-            token: generateToken({ ...user, tenantId: user.tenantId }),
-            user: { 
-                id: user.id, 
-                email: user.email, 
-                role: user.role,
-                fullName: user.fullName,
-                tenantId: user.tenantId
-            } 
-        }
-    });
-  } catch (error) { next(error); }
+    const token = jwt.sign(
+      { userId: user.id, tenantId: user.tenant_id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({ success: true, data: { token, user: { id: user.id, role: user.role } } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
-const getMe = async (req, res, next) => {
-    try {
-        const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-        res.json({ success: true, data: user });
-    } catch(e) { next(e); }
+exports.registerTenant = async (req, res) => {
+  // Simplistic implementation for registration
+  const { tenantName, subdomain, adminEmail, adminPassword, adminFullName } = req.body;
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    const tRes = await client.query(
+      `INSERT INTO tenants (name, subdomain) VALUES ($1, $2) RETURNING id`,
+      [tenantName, subdomain]
+    );
+    const tenantId = tRes.rows[0].id;
+    
+    const hash = await bcrypt.hash(adminPassword, 10);
+    await client.query(
+      `INSERT INTO users (email, password_hash, full_name, role, tenant_id) VALUES ($1, $2, $3, 'tenant_admin', $4)`,
+      [adminEmail, hash, adminFullName, tenantId]
+    );
+    
+    await client.query('COMMIT');
+    res.status(201).json({ success: true, message: 'Tenant registered' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(400).json({ success: false, message: err.message });
+  } finally {
+    client.release();
+  }
 };
 
-const logout = async (req, res) => { res.json({ success: true }); };
-
-module.exports = { registerTenant, login, getMe, logout };
+exports.getMe = async (req, res) => {
+    res.json({ success: true, data: req.user });
+};
